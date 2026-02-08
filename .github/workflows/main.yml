@@ -1,17 +1,13 @@
 name: Build OpenWrt Package
 
 on:
-  push:
-    branches:
-      - main
-      - master
-    tags:
-      - 'v*'
-  pull_request:
-    branches:
-      - main
-      - master
   workflow_dispatch:
+    inputs:
+      create_release:
+        description: 'Create GitHub Release'
+        required: false
+        default: false
+        type: boolean
 
 env:
   OPENWRT_VERSION: '24.10.5'
@@ -95,11 +91,14 @@ jobs:
           name: ${{ env.PACKAGE_NAME }}-${{ env.ARCH }}-openwrt-${{ env.OPENWRT_VERSION }}
           path: artifacts/*
           retention-days: 30
+          compression-level: 9
 
       - name: Create Release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: github.event.inputs.create_release == 'true'
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ env.PACKAGE_NAME }}-${{ env.OPENWRT_VERSION }}-${{ github.run_number }}
+          name: Release ${{ env.PACKAGE_NAME }} ${{ env.OPENWRT_VERSION }}
           files: artifacts/*
           body: |
             ## OpenWrt Package Release
@@ -109,13 +108,5 @@ jobs:
             **Target:** ${{ env.TARGET }}
             **Architecture:** ${{ env.ARCH }}
             
-            ### Installation
-            ```bash
-            opkg install ${{ env.PACKAGE_NAME }}_*.ipk
-            ```
-            
-            ### Files
-            - Package: `.ipk` file
-            - Checksums: `sha256sums.txt`
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
