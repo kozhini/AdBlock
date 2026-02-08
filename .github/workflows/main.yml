@@ -97,16 +97,29 @@ jobs:
         if: github.event.inputs.create_release == 'true'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ env.PACKAGE_NAME }}-${{ env.OPENWRT_VERSION }}-${{ github.run_number }}
-          name: Release ${{ env.PACKAGE_NAME }} ${{ env.OPENWRT_VERSION }}
+          tag_name: v${{ env.OPENWRT_VERSION }}-build${{ github.run_number }}
+          name: adblock ${{ env.OPENWRT_VERSION }} (Build ${{ github.run_number }})
+          draft: false
+          prerelease: false
           files: artifacts/*
           body: |
-            ## OpenWrt Package Release
+            ## OpenWrt adblock Package
             
-            **Package:** ${{ env.PACKAGE_NAME }}
             **Version:** ${{ env.OPENWRT_VERSION }}
             **Target:** ${{ env.TARGET }}
             **Architecture:** ${{ env.ARCH }}
-            
+
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Upload to Release (fallback)
+        if: github.event.inputs.create_release != 'true'
+        run: |
+          echo "⚠️  Release creation was disabled in workflow inputs"
+          echo "✅ Artifacts are available in the Actions tab"
+          echo ""
+          echo "To create a release:"
+          echo "1. Go to Actions → Build OpenWrt Package"
+          echo "2. Click 'Run workflow'"
+          echo "3. Check 'Create GitHub Release'"
+          echo "4. Click 'Run workflow' button"
