@@ -50,10 +50,15 @@ jobs:
           mv openwrt-sdk-* openwrt-sdk
           rm -f openwrt-sdk.tar openwrt-sdk.tar.zst
 
-      - name: Prepare package directory
+      - name: Prepare package directories
         run: |
-          mkdir -p openwrt-sdk/package/${PACKAGE_NAME}
-          cp -r Makefile files openwrt-sdk/package/${PACKAGE_NAME}/
+          # Prepare adblock package
+          mkdir -p openwrt-sdk/package/adblock
+          cp -r Makefile files openwrt-sdk/package/adblock/
+          
+          # Prepare luci-app-adblock package
+          mkdir -p openwrt-sdk/package/luci-app-adblock
+          cp -r luci-app-adblock/* openwrt-sdk/package/luci-app-adblock/
 
       - name: Update feeds
         working-directory: openwrt-sdk
@@ -64,19 +69,23 @@ jobs:
       - name: Configure build
         working-directory: openwrt-sdk
         run: |
-          echo "CONFIG_PACKAGE_${PACKAGE_NAME}=m" > .config
+          echo "CONFIG_PACKAGE_adblock=m" > .config
+          echo "CONFIG_PACKAGE_luci-app-adblock=m" >> .config
           make defconfig
 
-      - name: Build package
+      - name: Build packages
         working-directory: openwrt-sdk
         run: |
-          make package/${PACKAGE_NAME}/compile V=s -j$(nproc)
+          make package/adblock/compile V=s -j$(nproc)
+          make package/luci-app-adblock/compile V=s -j$(nproc)
 
       - name: Collect artifacts
         run: |
           mkdir -p artifacts
-          find openwrt-sdk/bin/packages/ -name "${PACKAGE_NAME}*.ipk" -exec cp {} artifacts/ \;
-          find openwrt-sdk/bin/targets/ -name "${PACKAGE_NAME}*.ipk" -exec cp {} artifacts/ \;
+          find openwrt-sdk/bin/packages/ -name "adblock*.ipk" -exec cp {} artifacts/ \;
+          find openwrt-sdk/bin/packages/ -name "luci-app-adblock*.ipk" -exec cp {} artifacts/ \;
+          find openwrt-sdk/bin/targets/ -name "adblock*.ipk" -exec cp {} artifacts/ \;
+          find openwrt-sdk/bin/targets/ -name "luci-app-adblock*.ipk" -exec cp {} artifacts/ \;
           ls -lh artifacts/
 
       - name: Generate checksums
@@ -88,7 +97,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v6
         with:
-          name: ${{ env.PACKAGE_NAME }}-${{ env.ARCH }}-openwrt-${{ env.OPENWRT_VERSION }}
+          name: openwrt-packages-${{ env.ARCH }}-${{ env.OPENWRT_VERSION }}
           path: artifacts/*
           retention-days: 30
           compression-level: 9
@@ -103,12 +112,47 @@ jobs:
           prerelease: false
           files: artifacts/*
           body: |
-            ## OpenWrt adblock Package
+            ## OpenWrt Packages Release
             
+            **Packages:** adblock + luci-app-adblock
             **Version:** ${{ env.OPENWRT_VERSION }}
             **Target:** ${{ env.TARGET }}
             **Architecture:** ${{ env.ARCH }}
-
+            **Build:** #${{ github.run_number }}
+            **Date:** ${{ github.event.repository.updated_at }}
+            
+            ### 📦 Installation
+            
+            Download both `.ipk` files and install:
+            
+            ```bash
+            # Transfer to router
+            scp adblock_*.ipk luci-app-adblock_*.ipk root@192.168.1.1:/tmp/
+            
+            # SSH to router and install
+            ssh root@192.168.1.1
+            opkg install /tmp/adblock_*.ipk
+            opkg install /tmp/luci-app-adblock_*.ipk
+            ```
+            
+            ### ✅ Verification
+            
+            Verify package integrity:
+            ```bash
+            sha256sum -c sha256sums.txt
+            ```
+            
+            ### 📋 Files in this release
+            - `adblock_*.ipk` - Main backend package
+            - `luci-app-adblock_*.ipk` - LuCI web interface
+            - `sha256sums.txt` - Checksums for verification
+            
+            ### 🔧 Configuration
+            
+            After installation, configure in LuCI:
+            - Navigate to **Services** → **Adblock**
+            - Enable the service
+            - Select feeds and save
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       
